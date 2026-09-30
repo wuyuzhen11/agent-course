@@ -1,0 +1,24 @@
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Java build output
+target/
+.build/
+out/
+*.class
+
+# IDE and operating system files
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs and local temporary files
+*.log
+*.tmp
+
+# Local environment and credentials
+.env
+*.key
+*.pem
+hs_err_pid*

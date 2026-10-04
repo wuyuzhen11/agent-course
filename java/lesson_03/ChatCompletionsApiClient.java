@@ -3,12 +3,24 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import java.net.http.HttpClient;
 import java.util.ArrayList;
 import java.util.List;
 
 final class ChatCompletionsApiClient extends AbstractModelApiClient {
-    ChatCompletionsApiClient(ClientConfig config) {
-        super(config);
+    ChatCompletionsApiClient(
+            ClientConfig config,
+            RetryPolicy retryPolicy
+    ) {
+        super(config, retryPolicy);
+    }
+
+    ChatCompletionsApiClient(
+            ClientConfig config,
+            HttpClient httpClient,
+            RetryPolicy retryPolicy
+    ) {
+        super(config,httpClient, retryPolicy);
     }
 
     @Override

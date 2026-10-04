@@ -1,3 +1,4 @@
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
@@ -47,6 +48,11 @@ final class ExponentialBackoffRetryPolicy implements RetryPolicy {
         ));
     }
 
+    @Override
+    public boolean isRetryableException(IOException error) {
+        return true;
+    }
+
     private long exponentialDelayMillis(int attempt) {
         long delay = BASE_DELAY_MILLIS;
         for (int current = 1;
@@ -75,4 +81,6 @@ final class ExponentialBackoffRetryPolicy implements RetryPolicy {
             return Optional.empty();
         }
     }
+
+
 }

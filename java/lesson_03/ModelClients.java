@@ -1,16 +1,39 @@
+import java.util.Objects;
+
 final class ModelClients {
+
+    static AbstractModelApiClient create(
+            ClientConfig config,
+            ApiProtocol protocol,
+            RetryPolicy retryPolicy
+    ) {
+        RetryPolicy retryPolicy1 = Objects.requireNonNull(retryPolicy, "retryPolicy");
+            return switch (protocol) {
+                case RESPONSES -> new ResponsesApiClient(
+                        config,
+                        retryPolicy1
+                );
+                case CHAT_COMPLETIONS -> new ChatCompletionsApiClient(
+                        config,
+                        retryPolicy1
+                );
+            };
+
+    }
+
     static AbstractModelApiClient create(
             ClientConfig config,
             ApiProtocol protocol
     ) {
-        return switch (protocol) {
-            case RESPONSES -> new ResponsesApiClient(config);
-            case CHAT_COMPLETIONS -> new ChatCompletionsApiClient(config);
-        };
+        return create(
+                config,
+                protocol,
+                new ExponentialBackoffRetryPolicy()
+        );
     }
 
     static AbstractModelApiClient create(ClientConfig config) {
-        return create(config, resolveProtocol(config.model()));
+        return create(config, resolveProtocol(config.model()),new ExponentialBackoffRetryPolicy());
     }
 
     static ApiProtocol resolveProtocol(String model) {

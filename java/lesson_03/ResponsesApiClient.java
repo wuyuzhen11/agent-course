@@ -3,12 +3,24 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import java.net.http.HttpClient;
 import java.util.ArrayList;
 import java.util.List;
 
 final class ResponsesApiClient extends AbstractModelApiClient {
-    ResponsesApiClient(ClientConfig config) {
-        super(config);
+    ResponsesApiClient(
+            ClientConfig config,
+            RetryPolicy retryPolicy
+    ) {
+        super(config, retryPolicy);
+    }
+
+    ResponsesApiClient(
+            ClientConfig config,
+            HttpClient http,
+            RetryPolicy retryPolicy
+    ){
+        super(config, http, retryPolicy);
     }
 
     @Override

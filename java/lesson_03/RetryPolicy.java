@@ -1,3 +1,4 @@
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Optional;
 
@@ -10,4 +11,6 @@ interface RetryPolicy {
             int attempt,
             Optional<String> retryAfter
     );
+
+    boolean isRetryableException(IOException error);
 }

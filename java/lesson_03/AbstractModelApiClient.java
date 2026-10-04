@@ -14,16 +14,28 @@ import java.util.Optional;
 abstract class AbstractModelApiClient implements ModelClient {
     protected final ClientConfig config;
     protected final ObjectMapper json;
-    private final HttpClient http;
+    private final HttpTransport transport;
     private final RetryPolicy retryPolicy;
 
     AbstractModelApiClient(
             ClientConfig config,
             RetryPolicy retryPolicy
     ) {
-        this(config, HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build(), retryPolicy);
+        this(config, new JdkHttpTransport(), retryPolicy);
+    }
+
+    AbstractModelApiClient(
+            ClientConfig config,
+            HttpTransport transport,
+            RetryPolicy retryPolicy
+    ) {
+        this.config = Objects.requireNonNull(config, "config");
+        this.transport = Objects.requireNonNull(transport, "transport");
+        this.json = new ObjectMapper();
+        this.retryPolicy = Objects.requireNonNull(
+                retryPolicy,
+                "retryPolicy"
+        );
     }
 
     AbstractModelApiClient(
@@ -31,13 +43,7 @@ abstract class AbstractModelApiClient implements ModelClient {
             HttpClient http,
             RetryPolicy retryPolicy
     ) {
-        this.config = config;
-        this.http = http;
-        this.json = new ObjectMapper();
-        this.retryPolicy = Objects.requireNonNull(
-                retryPolicy,
-                "retryPolicy"
-        );
+        this(config, new JdkHttpTransport(http), retryPolicy);
     }
 
     @Override
@@ -84,12 +90,7 @@ abstract class AbstractModelApiClient implements ModelClient {
              attempt <= retryPolicy.maxAttempts();
              attempt++) {
             try {
-                HttpResponse<String> response = http.send(
-                        request,
-                        HttpResponse.BodyHandlers.ofString(
-                                StandardCharsets.UTF_8
-                        )
-                );
+                HttpResponse<String> response = transport.send(request);
 
                 int status = response.statusCode();
 

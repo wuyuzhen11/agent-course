@@ -7,18 +7,12 @@ final class ModelClients {
             ApiProtocol protocol,
             RetryPolicy retryPolicy
     ) {
-        RetryPolicy retryPolicy1 = Objects.requireNonNull(retryPolicy, "retryPolicy");
-            return switch (protocol) {
-                case RESPONSES -> new ResponsesApiClient(
-                        config,
-                        retryPolicy1
-                );
-                case CHAT_COMPLETIONS -> new ChatCompletionsApiClient(
-                        config,
-                        retryPolicy1
-                );
-            };
-
+        return create(
+                config,
+                protocol,
+                new JdkHttpTransport(),
+                retryPolicy
+        );
     }
 
     static AbstractModelApiClient create(
@@ -30,6 +24,30 @@ final class ModelClients {
                 protocol,
                 new ExponentialBackoffRetryPolicy()
         );
+    }
+
+    static AbstractModelApiClient create(
+            ClientConfig config,
+            ApiProtocol protocol,
+            HttpTransport transport,
+            RetryPolicy retryPolicy
+    ){
+        Objects.requireNonNull(retryPolicy, "retryPolicy");
+        Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(protocol, "protocol");
+        Objects.requireNonNull(transport, "transport");
+        return switch (protocol) {
+            case RESPONSES -> new ResponsesApiClient(
+                    config,
+                    transport,
+                    retryPolicy
+            );
+            case CHAT_COMPLETIONS -> new ChatCompletionsApiClient(
+                    config,
+                    transport,
+                    retryPolicy
+            );
+        };
     }
 
     static AbstractModelApiClient create(ClientConfig config) {

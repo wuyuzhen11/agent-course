@@ -17,9 +17,17 @@ final class ResponsesApiClient extends AbstractModelApiClient {
 
     ResponsesApiClient(
             ClientConfig config,
+            HttpTransport transport,
+            RetryPolicy retryPolicy
+    ) {
+        super(config, transport, retryPolicy);
+    }
+
+    ResponsesApiClient(
+            ClientConfig config,
             HttpClient http,
             RetryPolicy retryPolicy
-    ){
+    ) {
         super(config, http, retryPolicy);
     }
 

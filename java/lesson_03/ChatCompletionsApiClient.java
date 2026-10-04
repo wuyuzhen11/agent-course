@@ -17,10 +17,18 @@ final class ChatCompletionsApiClient extends AbstractModelApiClient {
 
     ChatCompletionsApiClient(
             ClientConfig config,
+            HttpTransport transport,
+            RetryPolicy retryPolicy
+    ) {
+        super(config, transport, retryPolicy);
+    }
+
+    ChatCompletionsApiClient(
+            ClientConfig config,
             HttpClient httpClient,
             RetryPolicy retryPolicy
     ) {
-        super(config,httpClient, retryPolicy);
+        super(config, httpClient, retryPolicy);
     }
 
     @Override

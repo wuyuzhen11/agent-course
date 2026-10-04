@@ -11,7 +11,9 @@ public final class Main {
 
         ClientConfig config = ClientConfig.fromEnvironment();
         ApiProtocol protocol = ModelClients.resolveProtocol(config.model());
-        AbstractModelApiClient client = ModelClients.create(config, protocol);
+        HttpTransport transport = new JdkHttpTransport();
+        RetryPolicy retryPolicy = new ExponentialBackoffRetryPolicy();
+        AbstractModelApiClient client = ModelClients.create(config,protocol, transport,retryPolicy);
         OrderTools tools = new OrderTools();
 
         System.out.println("[协议] " + protocol.label());

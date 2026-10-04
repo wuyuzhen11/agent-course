@@ -1,9 +1,11 @@
 import java.util.List;
 import java.util.Map;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-final class OrderTools implements ToolExecutor{
+
+final class OrderTools implements ToolExecutor {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -43,7 +45,7 @@ final class OrderTools implements ToolExecutor{
     }
 
     @Override
-    public ToolResult execute(RunContext context,ToolCall call) {
+    public ToolResult execute(RunContext context, ToolCall call) {
         if (!"get_order".equals(call.name())) {
             return new ToolResult(
                     call.callId(),
@@ -51,9 +53,13 @@ final class OrderTools implements ToolExecutor{
             );
         }
 
+        if (call.arguments() == null || call.arguments().isBlank()) {
+            return invalidArguments(call.callId());
+        }
+
         try {
             JsonNode arguments = objectMapper.readTree(call.arguments());
-            if (!arguments.isObject()) {
+            if (arguments == null || !arguments.isObject()) {
                 return invalidArguments(call.callId());
             }
 

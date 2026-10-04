@@ -1,4 +1,7 @@
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
+
 final class AgentLoop {
     private final ModelClient model;
     private final ToolExecutor tools;
@@ -44,11 +47,30 @@ final class AgentLoop {
                             limits
                     );
 
+                    Set<String> callIds = new HashSet<>();
+                    for (ToolCall call : turn.toolCalls()) {
+                        if (call.callId() == null
+                                || call.callId().isBlank()
+                                || !callIds.add(call.callId())) {
+                            throw new IllegalStateException(
+                                    "工具调用 callId 缺失或重复"
+                            );
+                        }
+                    }
+
                     for (ToolCall call : turn.toolCalls()) {
                         ToolResult result = tools.execute(
                                 context,
                                 call
                         );
+
+                        if (result == null
+                                || !call.callId().equals(result.callId())) {
+                            throw new IllegalStateException(
+                                    "工具结果 callId 与工具调用不匹配"
+                            );
+                        }
+
                         context.append(result);
                     }
 

@@ -10,18 +10,23 @@ final class RunContext {
     private int toolCalls;
     private RunStatus status;
 
-    private RunContext(String sessionId, String question) {
+    private RunContext(String sessionId, List<Message> previousHistory, String question) {
         if (sessionId == null || sessionId.isBlank()) {
             throw new IllegalArgumentException("sessionId 不能为空");
         }
 
         this.sessionId = sessionId;
+        this.history.addAll(Objects.requireNonNull(previousHistory, "previousHistory 不能为空"));
         this.history.add(new UserMessage(question));
         this.status = RunStatus.RUNNING;
     }
 
     static RunContext start(String sessionId, String question) {
-        return new RunContext(sessionId, question);
+        return start(sessionId, List.of(), question);
+    }
+
+    static RunContext start(String sessionId, List<Message> previousHistory, String question) {
+        return new RunContext(sessionId, previousHistory, question);
     }
 
     String sessionId() {

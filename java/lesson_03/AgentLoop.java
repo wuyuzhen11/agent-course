@@ -1,6 +1,5 @@
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,6 +11,8 @@ final class AgentLoop {
     private final ModelClient model;
     private final ToolExecutor tools;
     private final RunLimits limits;
+    private final HistoryWindow historyWindow;
+    private final int maxTurns;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -30,21 +31,52 @@ final class AgentLoop {
         this.model = model;
         this.tools = tools;
         this.limits = limits;
+        this.maxTurns = Integer.MAX_VALUE;
+        this.historyWindow = new HistoryWindow();
+    }
+    AgentLoop(
+            ModelClient model,
+            ToolExecutor tools,
+            RunLimits limits,
+            int maxTurns
+    ) {
+        this.model = model;
+        this.tools = tools;
+        this.limits = limits;
+        this.maxTurns = maxTurns;
+        this.historyWindow = new HistoryWindow();
     }
 
     AgentRunResult run(String question) {
+        return run(new AgentSession(UUID.randomUUID().toString()), question);
+    }
+
+    AgentRunResult run(AgentSession session, String question) {
+        if (session == null) {
+            throw new NullPointerException("session 不能为空");
+        }
+        if (question == null || question.isBlank()) {
+            throw new IllegalArgumentException("question 不能为空");
+        }
+        List<Message> savedHistory = session.history();
+        int size = savedHistory.size();
+        List<Message> select = historyWindow.select(savedHistory, maxTurns);
         RunContext context = RunContext.start(
-                UUID.randomUUID().toString(),
+                session.sessionId(),
+                savedHistory,
                 question
         );
         Set<ToolCallKey> seenToolCalls = new HashSet<>();
 
         try {
             while (true) {
+                List<Message> inputHistory = new ArrayList<>();
+                List<Message> contextHistory = context.history();
                 context.reserveModelCall(limits);
-
+                inputHistory.addAll(select);
+                inputHistory.addAll(contextHistory.subList(size, contextHistory.size()));
                 ModelTurn turn = model.next(
-                        context.history(),
+                        inputHistory,
                         tools.definitions()
                 );
 
@@ -107,13 +139,15 @@ final class AgentLoop {
                 if (turn.text() != null
                         && !turn.text().isBlank()) {
                     context.succeed();
-                    return new AgentRunResult(
+                    AgentRunResult result = new AgentRunResult(
                             turn.text(),
                             context.status(),
                             context.modelCalls(),
                             context.toolCalls(),
                             context.history()
                     );
+                    session.commit(result);
+                    return result;
                 }
 
                 throw new IllegalStateException(

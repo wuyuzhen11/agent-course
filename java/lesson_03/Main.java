@@ -1,4 +1,5 @@
 
+import java.nio.file.Path;
 import java.util.List;
 
 public final class Main {
@@ -49,7 +50,9 @@ public final class Main {
                     tools,
                     limits
             );
-            AgentRunResult result = loop.run(question);
+            SessionFileStore store = new SessionFileStore(Path.of("sessions"));
+            AgentSession session = AgentSession.open("demo", store);
+            AgentRunResult result = loop.run(session,question);
             System.out.println("[最终回答] " + result.finalAnswer());
         } catch (ModelApiException error) {
             System.err.println("[调用失败] " + error.getMessage());

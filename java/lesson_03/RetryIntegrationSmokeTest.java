@@ -588,21 +588,30 @@ final class RetryIntegrationSmokeTest {
                 new ModelTurn(
                         null,
                         List.of(
-                                new ToolCall("call-1", "get_order", "{}"),
-                                new ToolCall("call-2", "get_order", "{}")
+                                new ToolCall(
+                                        "call-1",
+                                        "get_order",
+                                        "{\"orderId\":\"123\"}"
+                                ),
+                                new ToolCall(
+                                        "call-2",
+                                        "get_order",
+                                        "{\"orderId\":\"456\"}"
+                                )
                         )
                 ),
                 new ModelTurn("done", List.of())
         );
         RecordingToolExecutor tools = new RecordingToolExecutor(false, false);
 
-        String answer = new AgentLoop(
+        AgentRunResult result = new AgentLoop(
                 model,
                 tools,
                 new RunLimits(3, 3, 2)
         ).run("query orders");
 
-        require("done".equals(answer), "多工具 Agent 最终回答错误");
+        require("done".equals(result.finalAnswer()),
+                "多工具 Agent 最终回答错误");
         require(model.calls == 2, "多工具 Agent 模型调用次数错误");
         require(tools.callIds.equals(List.of("call-1", "call-2")),
                 "多工具执行顺序错误");

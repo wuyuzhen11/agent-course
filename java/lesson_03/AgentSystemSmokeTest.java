@@ -123,15 +123,19 @@ final class AgentSystemSmokeTest {
                 toolTurn("call-1", "call-2")
         );
         RecordingToolExecutor toolsPerTurn = new RecordingToolExecutor();
-        requireThrows(
-                AgentLimitExceededException.class,
-                () -> new AgentLoop(
-                        tooManyPerTurn,
-                        toolsPerTurn,
-                        new RunLimits(2, 3, 1)
-                ).run("question"),
-                "maxToolsPerTurn 应该生效"
+        AgentRunResult perTurnResult = new AgentLoop(
+                tooManyPerTurn,
+                toolsPerTurn,
+                new RunLimits(2, 3, 1)
+        ).run("question");
+        require(
+                perTurnResult.status() == RunStatus.FAILED,
+                "maxToolsPerTurn 应该返回失败结果"
         );
+        require(perTurnResult.modelCalls() == 1,
+                "单轮工具超限应该保留模型调用次数");
+        require(perTurnResult.toolCalls() == 0,
+                "单轮工具超限不应该计入工具调用");
         require(toolsPerTurn.callIds.isEmpty(),
                 "单轮工具超限时不应该执行工具");
 
@@ -139,15 +143,19 @@ final class AgentSystemSmokeTest {
                 toolTurn("call-1", "call-2")
         );
         RecordingToolExecutor toolsTotal = new RecordingToolExecutor();
-        requireThrows(
-                AgentLimitExceededException.class,
-                () -> new AgentLoop(
-                        tooManyTotal,
-                        toolsTotal,
-                        new RunLimits(2, 1, 2)
-                ).run("question"),
-                "maxToolCalls 应该生效"
+        AgentRunResult totalResult = new AgentLoop(
+                tooManyTotal,
+                toolsTotal,
+                new RunLimits(2, 1, 2)
+        ).run("question");
+        require(
+                totalResult.status() == RunStatus.FAILED,
+                "maxToolCalls 应该返回失败结果"
         );
+        require(totalResult.modelCalls() == 1,
+                "总工具超限应该保留模型调用次数");
+        require(totalResult.toolCalls() == 0,
+                "总工具超限不应该计入工具调用");
         require(toolsTotal.callIds.isEmpty(),
                 "总工具超限时不应该执行工具");
 
@@ -159,15 +167,19 @@ final class AgentSystemSmokeTest {
                 new ModelTurn("done", List.of())
         );
         RecordingToolExecutor toolsModel = new RecordingToolExecutor();
-        requireThrows(
-                AgentLimitExceededException.class,
-                () -> new AgentLoop(
-                        tooManyModelCalls,
-                        toolsModel,
-                        new RunLimits(1, 1, 1)
-                ).run("question"),
-                "maxModelCalls 应该生效"
+        AgentRunResult modelResult = new AgentLoop(
+                tooManyModelCalls,
+                toolsModel,
+                new RunLimits(1, 1, 1)
+        ).run("question");
+        require(
+                modelResult.status() == RunStatus.FAILED,
+                "maxModelCalls 应该返回失败结果"
         );
+        require(modelResult.modelCalls() == 1,
+                "模型预算耗尽应该保留模型调用次数");
+        require(modelResult.toolCalls() == 1,
+                "模型预算耗尽应该保留工具调用次数");
         require(tooManyModelCalls.calls == 1,
                 "模型预算耗尽后不应该进入第二次模型调用");
     }

@@ -49,7 +49,8 @@ public final class Main {
                     tools,
                     limits
             );
-            System.out.println("[最终回答] " + loop.run(question));
+            AgentRunResult result = loop.run(question);
+            System.out.println("[最终回答] " + result.finalAnswer());
         } catch (ModelApiException error) {
             System.err.println("[调用失败] " + error.getMessage());
             if (!error.responseBody().isBlank()) {

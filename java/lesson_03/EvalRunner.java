@@ -2,9 +2,15 @@ import java.util.ArrayList;
 import java.util.List;
 final class EvalRunner {
     private final ToolExecutor tools;
+    private final SystemMessage systemMessage;
 
     EvalRunner(ToolExecutor tools) {
+        this(tools, null);
+    }
+
+    EvalRunner(ToolExecutor tools, SystemMessage systemMessage) {
         this.tools = tools;
+        this.systemMessage = systemMessage;
     }
 
     EvalResult runOne(EvalCase evalCase) {
@@ -13,11 +19,18 @@ final class EvalRunner {
         try {
             ModelClient model = evalCase.modelFactory().get();
 
-            AgentLoop loop = new AgentLoop(
-                    model,
-                    tools,
-                    evalCase.limits()
-            );
+            AgentLoop loop = systemMessage == null
+                    ? new AgentLoop(
+                            model,
+                            tools,
+                            evalCase.limits()
+                    )
+                    : new AgentLoop(
+                            model,
+                            tools,
+                            evalCase.limits(),
+                            systemMessage
+                    );
 
             result = loop.run(evalCase.question());
         } catch (RuntimeException error) {

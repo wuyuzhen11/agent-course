@@ -8,11 +8,16 @@ final class AgentLoop {
 
     private static final String LIMIT_FALLBACK_MESSAGE =
             "本次查询暂时无法完成，请稍后重试；若问题持续，请联系人工客服。";
+    private static final SummaryPolicy SUMMARY_DISABLED =
+            new SummaryPolicy(Integer.MAX_VALUE, Integer.MAX_VALUE);
     private final ModelClient model;
     private final ToolExecutor tools;
     private final RunLimits limits;
     private final HistoryWindow historyWindow;
     private final int maxTurns;
+    private final SummaryPolicy summaryPolicy;
+    private final HistorySummarizer historySummarizer;
+    private final SystemMessage systemMessage;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -28,53 +33,249 @@ final class AgentLoop {
             ToolExecutor tools,
             RunLimits limits
     ) {
-        this.model = model;
-        this.tools = tools;
-        this.limits = limits;
-        this.maxTurns = Integer.MAX_VALUE;
-        this.historyWindow = new HistoryWindow();
+        this(
+                model,
+                tools,
+                limits,
+                Integer.MAX_VALUE,
+                SUMMARY_DISABLED,
+                new HistorySummarizer(model),
+                null
+        );
     }
+
     AgentLoop(
             ModelClient model,
             ToolExecutor tools,
             RunLimits limits,
             int maxTurns
     ) {
-        this.model = model;
-        this.tools = tools;
-        this.limits = limits;
+        this(
+                model,
+                tools,
+                limits,
+                maxTurns,
+                SUMMARY_DISABLED,
+                new HistorySummarizer(model),
+                null
+        );
+    }
+
+    AgentLoop(
+            ModelClient model,
+            ToolExecutor tools,
+            RunLimits limits,
+            SummaryPolicy summaryPolicy
+    ) {
+        this(
+                model,
+                tools,
+                limits,
+                Integer.MAX_VALUE,
+                summaryPolicy,
+                new HistorySummarizer(model),
+                null
+        );
+    }
+
+    AgentLoop(
+            ModelClient model,
+            ToolExecutor tools,
+            RunLimits limits,
+            SystemMessage systemMessage
+    ) {
+        this(
+                model,
+                tools,
+                limits,
+                Integer.MAX_VALUE,
+                SUMMARY_DISABLED,
+                new HistorySummarizer(model, systemMessage),
+                systemMessage
+        );
+    }
+
+    AgentLoop(
+            ModelClient model,
+            ToolExecutor tools,
+            RunLimits limits,
+            int maxTurns,
+            SummaryPolicy summaryPolicy
+    ) {
+        this(
+                model,
+                tools,
+                limits,
+                maxTurns,
+                summaryPolicy,
+                new HistorySummarizer(model),
+                null
+        );
+    }
+
+    AgentLoop(
+            ModelClient model,
+            ToolExecutor tools,
+            RunLimits limits,
+            SummaryPolicy summaryPolicy,
+            SystemMessage systemMessage
+    ) {
+        this(
+                model,
+                tools,
+                limits,
+                Integer.MAX_VALUE,
+                summaryPolicy,
+                new HistorySummarizer(model, systemMessage),
+                systemMessage
+        );
+    }
+
+    AgentLoop(
+            ModelClient model,
+            ToolExecutor tools,
+            RunLimits limits,
+            int maxTurns,
+            SummaryPolicy summaryPolicy,
+            SystemMessage systemMessage
+    ) {
+        this(
+                model,
+                tools,
+                limits,
+                maxTurns,
+                summaryPolicy,
+                new HistorySummarizer(model, systemMessage),
+                systemMessage
+        );
+    }
+
+    AgentLoop(
+            ModelClient model,
+            ToolExecutor tools,
+            RunLimits limits,
+            int maxTurns,
+            SummaryPolicy summaryPolicy,
+            HistorySummarizer historySummarizer
+    ) {
+        this(
+                model,
+                tools,
+                limits,
+                maxTurns,
+                summaryPolicy,
+                historySummarizer,
+                null
+        );
+    }
+
+    AgentLoop(
+            ModelClient model,
+            ToolExecutor tools,
+            RunLimits limits,
+            int maxTurns,
+            SummaryPolicy summaryPolicy,
+            HistorySummarizer historySummarizer,
+            SystemMessage systemMessage
+    ) {
+        this.model = Objects.requireNonNull(model, "model 不能为空");
+        this.tools = Objects.requireNonNull(tools, "tools 不能为空");
+        this.limits = Objects.requireNonNull(limits, "limits 不能为空");
         this.maxTurns = maxTurns;
         this.historyWindow = new HistoryWindow();
+        this.summaryPolicy = Objects.requireNonNull(
+                summaryPolicy,
+                "summaryPolicy 不能为空"
+        );
+        this.historySummarizer = Objects.requireNonNull(
+                historySummarizer,
+                "historySummarizer 不能为空"
+        );
+        this.systemMessage = systemMessage;
     }
 
     AgentRunResult run(String question) {
-        return run(new AgentSession(UUID.randomUUID().toString()), question);
+        return run(
+                new AgentSession(UUID.randomUUID().toString()),
+                question,
+                AccessContext.defaultUser()
+        );
     }
 
     AgentRunResult run(AgentSession session, String question) {
+        return run(session, question, AccessContext.defaultUser());
+    }
+
+    AgentRunResult run(
+            AgentSession session,
+            String question,
+            AccessContext accessContext
+    ) {
         if (session == null) {
             throw new NullPointerException("session 不能为空");
         }
         if (question == null || question.isBlank()) {
             throw new IllegalArgumentException("question 不能为空");
         }
+        Objects.requireNonNull(accessContext, "accessContext 不能为空");
         List<Message> savedHistory = session.history();
-        int size = savedHistory.size();
-        List<Message> select = historyWindow.select(savedHistory, maxTurns);
+        HistorySummary summary = session.summary();
         RunContext context = RunContext.start(
                 session.sessionId(),
+                accessContext,
                 savedHistory,
                 question
         );
         Set<ToolCallKey> seenToolCalls = new HashSet<>();
 
         try {
+            OptionalInt targetEndTurn = summaryPolicy.targetEndTurn(
+                    savedHistory,
+                    summary
+            );
+            if (targetEndTurn.isPresent()) {
+                context.reserveModelCall(limits);
+                summary = summary == null
+                        ? historySummarizer.summarize(
+                                savedHistory,
+                                1,
+                                targetEndTurn.getAsInt()
+                        )
+                        : historySummarizer.summarize(
+                                savedHistory,
+                                summary,
+                                targetEndTurn.getAsInt()
+                        );
+                session.updateSummary(summary);
+            }
+
+            int size = savedHistory.size();
+            List<Message> selectedHistory;
+            if (summary == null) {
+                selectedHistory = historyWindow.select(
+                        savedHistory,
+                        maxTurns
+                );
+            } else {
+                selectedHistory = historyWindow.selectAfterTurn(
+                        savedHistory,
+                        summary.endTurn(),
+                        maxTurns
+                );
+            }
+
             while (true) {
                 List<Message> inputHistory = new ArrayList<>();
                 List<Message> contextHistory = context.history();
-                context.reserveModelCall(limits);
-                inputHistory.addAll(select);
+                if (systemMessage != null) {
+                    inputHistory.add(systemMessage);
+                }
+                if (summary != null) {
+                    inputHistory.add(summary.toInputMessage());
+                }
+                inputHistory.addAll(selectedHistory);
                 inputHistory.addAll(contextHistory.subList(size, contextHistory.size()));
+                context.reserveModelCall(limits);
                 ModelTurn turn = model.next(
                         inputHistory,
                         tools.definitions()

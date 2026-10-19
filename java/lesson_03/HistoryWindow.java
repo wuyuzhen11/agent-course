@@ -26,4 +26,35 @@ public class HistoryWindow {
             return List.copyOf(history);
         }
     }
+
+    List<Message> selectAfterTurn(
+            List<Message> history,
+            int afterTurn,
+            int maxTurns
+    ) {
+        Objects.requireNonNull(history, "history 不能为空");
+        if (afterTurn < 0) {
+            throw new IllegalArgumentException("afterTurn 不能小于零");
+        }
+        if (afterTurn == 0) {
+            return select(history, maxTurns);
+        }
+
+        int turns = 0;
+        int startIndex = history.size();
+        for (int i = 0; i < history.size(); i++) {
+            if (history.get(i) instanceof UserMessage) {
+                turns++;
+                if (turns > afterTurn) {
+                    startIndex = i;
+                    break;
+                }
+            }
+        }
+
+        return select(
+                history.subList(startIndex, history.size()),
+                maxTurns
+        );
+    }
 }

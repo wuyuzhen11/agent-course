@@ -6,6 +6,7 @@ final class AgentSession {
     private List<Message> history;
     private SessionFileStore sessionFileStore;
     private long revision;
+    private HistorySummary summary;
 
     AgentSession(String sessionId) {
         if (sessionId == null || sessionId.isBlank()) {
@@ -30,8 +31,14 @@ final class AgentSession {
             throw new IllegalArgumentException("只有成功完成的运行结果可以提交到会话");
         }
         List<Message> lingshihistory = List.copyOf(result.history());
+        if (lingshihistory.stream()
+                .anyMatch(message -> message instanceof SystemMessage)) {
+            throw new IllegalArgumentException(
+                    "SystemMessage 只允许出现在模型输入"
+            );
+        }
         if (sessionFileStore != null) {
-            revision = sessionFileStore.save(sessionId, revision, lingshihistory);
+            revision = sessionFileStore.save(sessionId, revision, lingshihistory,summary);
         }
         history = List.copyOf(result.history());
     }
@@ -42,6 +49,25 @@ final class AgentSession {
         agentSession.revision = load.revision();
         agentSession.history = load.history();
         agentSession.sessionFileStore = store;
+        agentSession.summary = load.summary();
         return agentSession;
+    }
+
+    HistorySummary summary(){
+        return summary;
+    }
+
+    void updateSummary(HistorySummary newSummary) {
+        Objects.requireNonNull(newSummary, "newSummary 必须提供摘要");
+        long savedTurns = history.stream()
+                .filter(message -> message instanceof UserMessage)
+                .count();
+        if (newSummary.endTurn() > savedTurns) {
+            throw new IllegalArgumentException("摘要结束轮次必须位于已保存的历史范围内");
+        }
+        if (sessionFileStore != null) {
+            revision = sessionFileStore.save(sessionId, revision, history, newSummary);
+        }
+        summary = newSummary;
     }
 }

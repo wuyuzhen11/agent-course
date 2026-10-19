@@ -377,8 +377,7 @@ public final class EvalMain {
                 }
         );
 
-        EvalRunner runner = new EvalRunner(new OrderTools());
-        runner.run(List.of(
+        List<EvalCase> evalCases = List.of(
                 order123,
                 order456,
                 order999,
@@ -386,7 +385,30 @@ public final class EvalMain {
                 invalidArgumentsRecovery,
                 repeatedToolCall,
                 modelBudgetExhausted
-        ));
+        );
+
+        PromptVariant concisePrompt = new PromptVariant(
+                "A-简洁提示",
+                new SystemMessage("""
+                        你是订单助手。根据用户问题查询订单并给出简洁回答。
+                        """)
+        );
+        PromptVariant orderRulesPrompt = new PromptVariant(
+                "B-订单规则提示",
+                new SystemMessage("""
+                        你是订单服务助手。
+                        订单状态必须通过 get_order 工具确认，工具结果是事实来源。
+                        缺少订单号时先询问；工具失败时说明失败原因，不要编造状态。
+                        回答使用简洁中文，完成工具调用后再回答用户。
+                        没有订单号时禁止调用订单工具，先向用户询问订单号。
+                        """)
+        );
+
+        new PromptComparisonRunner(new OrderTools()).run(
+                evalCases,
+                concisePrompt,
+                orderRulesPrompt
+        );
     }
 
     private static void require(

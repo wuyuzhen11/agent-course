@@ -7,7 +7,16 @@ import java.util.List;
  * ToolCall 是 ModelTurn 内部的单个工具调用请求。
  */
 sealed interface Message
-        permits UserMessage, ModelTurn, ToolResult {
+        permits SystemMessage, UserMessage, ModelTurn, ToolResult {
+}
+
+/** 只参与模型输入的程序规则，不属于会话历史。 */
+record SystemMessage(String text) implements Message {
+    SystemMessage {
+        if (text == null || text.isBlank()) {
+            throw new IllegalArgumentException("系统提示词必须包含有效文本");
+        }
+    }
 }
 
 record UserMessage(String text) implements Message {

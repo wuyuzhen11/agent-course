@@ -40,6 +40,13 @@ final class ChatCompletionsApiClient extends AbstractModelApiClient {
         ArrayNode messages = json.createArrayNode();
 
         for (Message message : history) {
+            if (message instanceof SystemMessage system) {
+                ObjectNode item = messages.addObject();
+                item.put("role", "system");
+                item.put("content", system.text());
+                continue;
+            }
+
             if (message instanceof UserMessage user) {
                 ObjectNode item = messages.addObject();
                 item.put("role", "user");

@@ -137,6 +137,13 @@ final class ResponsesApiClient extends AbstractModelApiClient {
         ArrayNode input = json.createArrayNode();
 
         for (Message message : history) {
+            if (message instanceof SystemMessage system) {
+                ObjectNode item = input.addObject();
+                item.put("role", "system");
+                item.put("content", system.text());
+                continue;
+            }
+
             if (message instanceof UserMessage user) {
                 ObjectNode item = input.addObject();
                 item.put("role", "user");

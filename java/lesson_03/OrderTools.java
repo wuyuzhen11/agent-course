@@ -9,10 +9,23 @@ final class OrderTools implements ToolExecutor {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private final Map<String, String> orders = Map.of(
-            "123", "订单 123，状态：已发货",
-            "456", "订单 456，状态：待发货"
+    private final Map<String, OrderData> orders = Map.of(
+            "123", new OrderData(
+                    AccessContext.DEFAULT_USER_ID,
+                    "订单 123，状态：已发货"
+            ),
+            "456", new OrderData(
+                    AccessContext.DEFAULT_USER_ID,
+                    "订单 456，状态：待发货"
+            )
     );
+
+    private ToolResult accessDenied(String callId) {
+        return new ToolResult(
+                callId,
+                "{\"code\":\"ACCESS_DENIED\",\"message\":\"当前用户无权查询该订单\"}"
+        );
+    }
 
     private ToolResult invalidArguments(String callId) {
         return new ToolResult(
@@ -72,12 +85,18 @@ final class OrderTools implements ToolExecutor {
                 return invalidArguments(call.callId());
             }
             String value = orderId.asText();
-            String content = orders.getOrDefault(
-                    value,
-                    "ORDER_NOT_FOUND：请核对订单号"
-            );
+            OrderData order = orders.get(value);
+            if (order == null) {
+                return new ToolResult(
+                        call.callId(),
+                        "ORDER_NOT_FOUND：请核对订单号"
+                );
+            }
+            if (!order.ownerId().equals(context.accessContext().userId())) {
+                return accessDenied(call.callId());
+            }
 
-            return new ToolResult(call.callId(), content);
+            return new ToolResult(call.callId(), order.content());
         } catch (JsonProcessingException error) {
             return new ToolResult(
                     call.callId(),
@@ -85,5 +104,8 @@ final class OrderTools implements ToolExecutor {
             );
         }
 
+    }
+
+    private record OrderData(String ownerId, String content) {
     }
 }

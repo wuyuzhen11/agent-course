@@ -13,4 +13,15 @@ record HistorySummary(String content, int startTurn, int endTurn) {
             throw new IllegalArgumentException("endTurn 必须大于或等于 startTurn");
         }
     }
+
+    UserMessage toInputMessage() {
+        return new UserMessage(
+                "历史会话摘要（覆盖第 "
+                        + startTurn
+                        + " 至 "
+                        + endTurn
+                        + " 轮，仅用于恢复会话背景，当前用户消息优先）：\n"
+                        + content
+        );
+    }
 }

@@ -34,7 +34,7 @@ final class SessionFileStore {
     StoredSession load(String sessionId) {
         Path file = fileFor(sessionId);
         if (Files.notExists(file)) {
-            return new StoredSession(0, List.of());
+            return new StoredSession(0, List.of(), null);
         }
 
         try {
@@ -48,8 +48,15 @@ final class SessionFileStore {
     }
 
     long save(String sessionId, long expectedRevision, List<Message> history) {
+        return save(sessionId, expectedRevision, history, load(sessionId).summary());
+    }
+
+    long save(String sessionId, long expectedRevision, List<Message> history,
+              HistorySummary summary) {
         Path file = fileFor(sessionId);
+        history = List.copyOf(history);
         validateHistory(history);
+        validateSummary(summary, history);
         if (expectedRevision < 0) {
             throw new IllegalArgumentException("会话版本不能小于零");
         }
@@ -69,7 +76,7 @@ final class SessionFileStore {
                 try {
                     Files.writeString(
                             temporary,
-                            encode(sessionId, nextRevision, history),
+                            encode(sessionId, nextRevision, history, summary),
                             StandardCharsets.UTF_8
                     );
                     Files.move(
@@ -93,11 +100,20 @@ final class SessionFileStore {
         return directory.resolve(sessionId + ".json");
     }
 
-    private String encode(String sessionId, long revision, List<Message> history) {
+    private String encode(String sessionId, long revision, List<Message> history,
+                          HistorySummary summary) {
         ObjectNode root = json.createObjectNode();
         root.put("schemaVersion", SCHEMA_VERSION);
         root.put("sessionId", sessionId);
         root.put("revision", revision);
+        if (summary == null) {
+            root.putNull("summary");
+        } else {
+            ObjectNode summaryNode = root.putObject("summary");
+            summaryNode.put("content", summary.content());
+            summaryNode.put("startTurn", summary.startTurn());
+            summaryNode.put("endTurn", summary.endTurn());
+        }
 
         ArrayNode items = root.putArray("history");
         for (Message message : history) {
@@ -169,7 +185,42 @@ final class SessionFileStore {
             }
         }
         validateHistory(history);
-        return new StoredSession(root.path("revision").longValue(), List.copyOf(history));
+        HistorySummary summary = decodeSummary(root.get("summary"));
+        validateSummary(summary, history);
+        return new StoredSession(root.path("revision").longValue(), history, summary);
+    }
+
+    private HistorySummary decodeSummary(JsonNode node) {
+        // 缺省字段表示该存档尚未生成摘要。
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (!node.isObject()
+                || !node.path("startTurn").isInt()
+                || !node.path("endTurn").isInt()) {
+            throw new SessionPersistenceException("会话摘要必须包含整数轮次范围");
+        }
+        try {
+            return new HistorySummary(
+                    requiredText(node, "content"),
+                    node.path("startTurn").intValue(),
+                    node.path("endTurn").intValue()
+            );
+        } catch (IllegalArgumentException error) {
+            throw new SessionPersistenceException("会话摘要必须具有有效的轮次范围", error);
+        }
+    }
+
+    private static void validateSummary(HistorySummary summary, List<Message> history) {
+        if (summary == null) {
+            return;
+        }
+        long savedTurns = history.stream()
+                .filter(message -> message instanceof UserMessage)
+                .count();
+        if (summary.endTurn() > savedTurns) {
+            throw new SessionPersistenceException("摘要结束轮次必须位于已保存的历史范围内");
+        }
     }
 
     private ModelTurn decodeModelTurn(JsonNode item) {
@@ -238,6 +289,12 @@ final class SessionFileStore {
         Set<String> pendingCallIds = new HashSet<>();
 
         for (Message message : history) {
+            if (message instanceof SystemMessage) {
+                throw new SessionPersistenceException(
+                        "SystemMessage 只允许出现在模型输入"
+                );
+            }
+
             if (message instanceof UserMessage user) {
                 if (!expectsUser || user.text() == null || user.text().isBlank()) {
                     throw new SessionPersistenceException("用户消息顺序无效");
@@ -284,7 +341,7 @@ final class SessionFileStore {
         }
     }
 
-    record StoredSession(long revision, List<Message> history) {
+    record StoredSession(long revision, List<Message> history, HistorySummary summary) {
         StoredSession {
             history = List.copyOf(history);
         }
